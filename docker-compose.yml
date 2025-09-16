@@ -1,0 +1,51 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes: # Garante que os dados do Zookeeper não se perdem.
+      - zookeeper_data:/var/lib/zookeeper/data
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    volumes: # Garante que os tópicos e mensagens do Kafka não se perdem.
+      - kafka_data:/var/lib/kafka/data
+
+  calculator:
+    build: ./calculator
+    depends_on:
+      - kafka
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    restart: unless-stopped
+    volumes:
+      - ./calculator/logs:/logs
+
+  rest:
+    build: ./rest
+    depends_on:
+      - kafka
+    ports: # Expõe a API na porta 8080.
+      - "8080:8080"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    restart: unless-stopped
+    volumes: # Garante que os logs da API aparecam na pasta do projeto.
+      - ./rest/logs:/logs
+
+# Declara os volumes para persistência de dados.
+volumes:
+  zookeeper_data:
+  kafka_data:
